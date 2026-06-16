@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Spurs Analytics MCP · Governed Data Pipeline</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0c0e12;
+    --surface: #15181d;
+    --surface2: #1c2027;
+    --border: #2a2f38;
+    --accent: #c4ced4;
+    --silver: #8a929c;
+    --accent2: #5b9bd5;
+    --good: #4caf83;
+    --warn: #d9a441;
+    --text: #eef0f2;
+    --text2: #868d97;
+    --font: 'Inter', system-ui, sans-serif;
+    --mono: 'SF Mono', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; }
+
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display:flex; align-items:center; justify-content:space-between; height: 54px; position: sticky; top:0; z-index:100; }
+  .nav-brand { font-size: 14.5px; font-weight: 700; letter-spacing: -0.2px; }
+  .nav-brand span { color: var(--accent2); }
+  .pill { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid; }
+  .pill-blue { background: rgba(91,155,213,0.1); color: var(--accent2); border-color: rgba(91,155,213,0.3); }
+  .pill-good { background: rgba(76,175,131,0.1); color: var(--good); border-color: rgba(76,175,131,0.3); }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 24px 72px; }
+  .hero h1 { font-size: 25px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 8px; }
+  .hero h1 em { color: var(--accent2); font-style: normal; }
+  .hero p { color: var(--text2); max-width: 660px; font-size: 13.5px; }
+
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin: 32px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  .pipeline { display: flex; align-items: stretch; gap: 0; margin-bottom: 8px; overflow-x: auto; }
+  .pipe-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; min-width: 200px; flex: 1; }
+  .pipe-stage .stage-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2); margin-bottom: 6px; }
+  .pipe-stage .stage-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .pipe-stage .stage-desc { font-size: 11.5px; color: var(--text2); line-height: 1.5; }
+  .pipe-arrow { display: flex; align-items: center; justify-content: center; padding: 0 10px; color: var(--text2); font-size: 18px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text2); margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+  .kpi-sub { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 22px; }
+  .card-title { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 18px; display:flex; align-items:center; gap:8px; }
+  .card-title::before { content:''; width:3px; height:13px; border-radius:2px; background: var(--accent2); display:inline-block; }
+  .chart-wrap { position: relative; }
+  .h220 { height: 220px; }
+
+  .terminal { background: #090a0d; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .terminal-bar { background: var(--surface2); padding: 8px 14px; display:flex; align-items:center; gap: 8px; border-bottom: 1px solid var(--border); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .terminal-title { font-size: 11px; color: var(--text2); margin-left: 6px; font-family: var(--mono); }
+  .terminal-body { padding: 16px 18px; font-family: var(--mono); font-size: 12px; line-height: 1.7; }
+  .t-comment { color: var(--text2); }
+  .t-result { color: var(--text); white-space: pre-wrap; }
+
+  .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .tool-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .tool-name { font-family: var(--mono); font-size: 12.5px; color: var(--accent2); font-weight: 600; margin-bottom: 6px; }
+  .tool-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th { text-align:left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); padding: 0 10px 10px; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 9px 10px; border-bottom: 1px solid rgba(42,47,56,0.6); }
+  tbody tr:hover { background: var(--surface2); }
+  .tier-badge { padding: 2px 8px; border-radius: 9px; font-size: 10.5px; font-weight: 600; }
+  .tier-marquee { background: rgba(217,164,65,0.12); color: var(--warn); }
+  .tier-rival { background: rgba(76,175,131,0.12); color: var(--good); }
+  .tier-division { background: rgba(91,155,213,0.12); color: var(--accent2); }
+  .tier-standard { background: rgba(134,141,151,0.12); color: var(--text2); }
+
+  footer { text-align:center; color: var(--text2); font-size: 12px; padding: 28px; border-top: 1px solid var(--border); margin-top: 16px; }
+  footer a { color: var(--accent2); text-decoration: none; }
+
+  @media (max-width: 768px) {
+    .kpi-row, .grid-2, .tool-grid { grid-template-columns: 1fr 1fr; }
+    .pipeline { flex-direction: column; }
+    .pipe-arrow { transform: rotate(90deg); padding: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">Spurs<span>Analytics</span> · MCP Data Layer</div>
+  <div style="display:flex;gap:10px;">
+    <span class="pill pill-blue">Node.js · MCP SDK</span>
+    <span class="pill pill-good">Python ETL</span>
+  </div>
+</nav>
+
+<main>
+  <div class="hero">
+    <h1>Governed Sports Analytics, <em>Exposed to AI Agents</em></h1>
+    <p>A Python ETL pipeline builds a documented, governed data model from raw ticketing and attendance data — then a Model Context Protocol (MCP) server exposes that model as structured tools, so any AI agent or assistant can query it safely without touching raw source data.</p>
+  </div>
+
+  <div class="section-label">Pipeline Architecture</div>
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="stage-label">Extract</div>
+      <div class="stage-title">Raw Sources</div>
+      <div class="stage-desc">Ticketing, attendance & fan engagement extracts — games.csv, ticket_sales.csv, fan_engagement.csv</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage">
+      <div class="stage-label">Transform</div>
+      <div class="stage-title">Python ETL</div>
+      <div class="stage-desc">Joins, aggregates seat-tier sales to game grain, computes derived metrics, emits data dictionary</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage">
+      <div class="stage-label">Govern</div>
+      <div class="stage-title">Curated Model</div>
+      <div class="stage-desc">game_performance + seat_tier_sales tables, each with documented grain, keys & column definitions</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage">
+      <div class="stage-label">Serve</div>
+      <div class="stage-title">MCP Server</div>
+      <div class="stage-desc">4 typed tools exposed over stdio — any MCP client (Claude, agents, BI copilots) can query safely</div>
+    </div>
+  </div>
+
+  <div class="section-label">MCP Tools Exposed</div>
+  <div class="tool-grid">
+    <div class="tool-card">
+      <div class="tool-name">list_games(opponent_tier?, min_sellthrough?, promo_night_only?, limit)</div>
+      <div class="tool-desc">Browse games with optional filters — returns sellthrough, attendance, revenue per game.</div>
+    </div>
+    <div class="tool-card">
+      <div class="tool-name">get_game_detail(game_id)</div>
+      <div class="tool-desc">Full fact + seat-tier breakdown for one game, including pricing and channel mix per tier.</div>
+    </div>
+    <div class="tool-card">
+      <div class="tool-name">query_revenue_summary(opponent_tier?, promo_night_only?)</div>
+      <div class="tool-desc">Aggregate revenue, sellthrough, attendance & satisfaction — answers comparison questions without raw rows.</div>
+    </div>
+    <div class="tool-card">
+      <div class="tool-name">get_data_dictionary()</div>
+      <div class="tool-desc">Self-describing schema — grain, primary keys, and column definitions an agent can introspect first.</div>
+    </div>
+  </div>
+
+  <div class="section-label">Sample Agent Query (Live Test Output)</div>
+  <div class="terminal" style="margin-bottom: 8px;">
+    <div class="terminal-bar">
+      <div class="dot" style="background:#ff5f57;"></div>
+      <div class="dot" style="background:#febc2e;"></div>
+      <div class="dot" style="background:#28c840;"></div>
+      <div class="terminal-title">mcp_server/server.js — stdio transport</div>
+    </div>
+    <div class="terminal-body">
+<span class="t-comment">// agent calls query_revenue_summary({ opponent_tier: "marquee" })</span>
+<span class="t-result">{
+  "games_matched": 9,
+  "total_revenue": 30607244,
+  "avg_revenue_per_game": 3400805,
+  "avg_sellthrough": 0.986,
+  "avg_attendance": 18280,
+  "avg_fan_satisfaction": 8.06
+}</span>
+    </div>
+  </div>
+
+  <div class="section-label">Season Snapshot (Underlying Data Model)</div>
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Home Games</div>
+      <div class="kpi-value">41</div>
+      <div class="kpi-sub">2025–26 season</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value">$114.5M</div>
+      <div class="kpi-sub">Tickets + concessions + merch</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg Sellthrough</div>
+      <div class="kpi-value">85.8%</div>
+      <div class="kpi-sub">Across all seat tiers</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg Attendance</div>
+      <div class="kpi-value">16,443</div>
+      <div class="kpi-sub">of 18,418 capacity</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-title">Avg Revenue by Opponent Tier</div>
+      <div class="chart-wrap h220"><canvas id="chartTier"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Sellthrough Rate by Opponent Tier</div>
+      <div class="chart-wrap h220"><canvas id="chartSellthrough"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-label">Game Performance (Sample Rows from Governed Model)</div>
+  <div class="card">
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>Game ID</th><th>Date</th><th>Opponent</th><th>Tier</th><th>Sellthrough</th><th>Attendance</th><th>Revenue</th><th>Satisfaction</th></tr>
+        </thead>
+        <tbody id="gameRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Built by <strong>Siri Lahari Chava</strong> · Data Scientist & ML Engineer ·
+  <a href="https://github.com/sirilahari10" target="_blank">GitHub</a> ·
+  <a href="https://linkedin.com/in/sirilahari" target="_blank">LinkedIn</a>
+  <br/><br/>
+  Synthetic data calibrated to NBA arena & ticketing benchmarks. Built to explore MCP-based governed data access for AI agent workflows.
+</footer>
+
+<script>
+const CHART_BASE = {
+  responsive:true, maintainAspectRatio:false,
+  plugins: { legend:{display:false}, tooltip:{ backgroundColor:'#15181d', borderColor:'#2a2f38', borderWidth:1, titleColor:'#eef0f2', bodyColor:'#868d97', padding:10 } },
+  scales: { x:{ grid:{color:'rgba(42,47,56,0.6)'}, ticks:{color:'#868d97', font:{size:11}} }, y:{ grid:{color:'rgba(42,47,56,0.6)'}, ticks:{color:'#868d97', font:{size:11}} } }
+};
+
+new Chart(document.getElementById('chartTier'), {
+  type:'bar',
+  data: { labels:['Marquee','Rival','Division','Standard'], datasets:[{ data:[3400805,3033785,2590412,2499008], backgroundColor:['#d9a441','#4caf83','#5b9bd5','#868d97'], borderRadius:5 }] },
+  options: { ...CHART_BASE, scales:{ ...CHART_BASE.scales, y:{...CHART_BASE.scales.y, ticks:{...CHART_BASE.scales.y.ticks, callback:v=>'$'+(v/1e6).toFixed(1)+'M'}} } }
+});
+
+new Chart(document.getElementById('chartSellthrough'), {
+  type:'bar',
+  data: { labels:['Marquee','Rival','Division','Standard'], datasets:[{ data:[98.6,92.1,82.6,78.7], backgroundColor:['#d9a441','#4caf83','#5b9bd5','#868d97'], borderRadius:5 }] },
+  options: { ...CHART_BASE, scales:{ ...CHART_BASE.scales, y:{...CHART_BASE.scales.y, min:60, max:100, ticks:{...CHART_BASE.scales.y.ticks, callback:v=>v+'%'}} } }
+});
+
+const games = [
+  {id:"GAME-001",date:"2025-10-22",opp:"Dallas Mavericks",tier:"rival",sell:100.0,att:18418,rev:3567420,sat:7.7},
+  {id:"GAME-003",date:"2025-10-30",opp:"Los Angeles Lakers",tier:"marquee",sell:100.0,att:18418,rev:3434529,sat:7.1},
+  {id:"GAME-005",date:"2025-11-05",opp:"Boston Celtics",tier:"marquee",sell:92.5,att:17178,rev:2999697,sat:9.4},
+  {id:"GAME-008",date:"2025-11-15",opp:"New Orleans Pelicans",tier:"division",sell:68.4,att:14540,rev:2177461,sat:8.3},
+  {id:"GAME-015",date:"2025-12-08",opp:"Detroit Pistons",tier:"standard",sell:56.3,att:11065,rev:1690187,sat:8.7},
+  {id:"GAME-019",date:"2025-12-22",opp:"Los Angeles Lakers",tier:"marquee",sell:100.0,att:18418,rev:3774724,sat:7.5},
+  {id:"GAME-024",date:"2026-01-12",opp:"New Orleans Pelicans",tier:"division",sell:83.4,att:15728,rev:2606916,sat:9.2},
+  {id:"GAME-035",date:"2026-02-18",opp:"Los Angeles Lakers",tier:"marquee",sell:100.0,att:18418,rev:3524325,sat:8.4},
+];
+const tb = document.getElementById('gameRows');
+games.forEach(g => {
+  tb.innerHTML += `<tr>
+    <td style="font-family:'SF Mono',monospace;color:#5b9bd5;">${g.id}</td>
+    <td style="color:#868d97;">${g.date}</td>
+    <td>${g.opp}</td>
+    <td><span class="tier-badge tier-${g.tier}">${g.tier}</span></td>
+    <td>${g.sell.toFixed(1)}%</td>
+    <td>${g.att.toLocaleString()}</td>
+    <td>$${(g.rev/1e6).toFixed(2)}M</td>
+    <td>${g.sat}</td>
+  </tr>`;
+});
+</script>
+</body>
+</html>
